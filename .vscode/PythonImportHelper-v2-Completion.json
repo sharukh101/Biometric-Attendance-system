@@ -27,6 +27,31 @@
         "documentation": {}
     },
     {
+        "label": "tkinter",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "messagebox",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "ttk",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -35,66 +60,21 @@
         "documentation": {}
     },
     {
-        "label": "train_model",
-        "kind": 2,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "def train_model():\n    training_data, labels = [], []\n    files = [f for f in os.listdir(data_path) if f.endswith(('.jpg', '.png', '.jpeg'))]\n    if not files:\n        print(\"❌ ERROR: 'training_images' folder khali hai! Isme apni photos daalein.\")\n        return None\n    print(\"🔍 Status: Extracting faces and Training...\")\n    valid_filenames = []\n    for i, file in enumerate(files):\n        img_path = os.path.join(data_path, file)",
-        "detail": "attendance_system",
+        "label": "pandas",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pandas",
+        "description": "pandas",
+        "detail": "pandas",
         "documentation": {}
     },
     {
-        "label": "markAttendance",
-        "kind": 2,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "def markAttendance(name):\n    if not os.path.exists('attendance.csv'):\n        with open('attendance.csv', 'w') as f:\n            f.write(\"Name,Time,Date\\n\")\n    with open('attendance.csv', 'r+') as f:\n        lines = f.readlines()\n        names = [line.split(',')[0] for line in lines]\n        if name not in names:\n            now = datetime.now()\n            f.writelines(f'{name},{now.strftime(\"%H:%M:%S\")},{now.strftime(\"%d-%m-%Y\")}\\n')",
-        "detail": "attendance_system",
-        "documentation": {}
-    },
-    {
-        "label": "data_path",
-        "kind": 5,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "data_path = 'training_images/'\nif not os.path.exists(data_path):\n    os.makedirs(data_path)\n# 1. Face Detector aur Recognizer\nface_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')\nmodel = cv2.face.LBPHFaceRecognizer_create()\ndef train_model():\n    training_data, labels = [], []\n    files = [f for f in os.listdir(data_path) if f.endswith(('.jpg', '.png', '.jpeg'))]\n    if not files:",
-        "detail": "attendance_system",
-        "documentation": {}
-    },
-    {
-        "label": "face_classifier",
-        "kind": 5,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')\nmodel = cv2.face.LBPHFaceRecognizer_create()\ndef train_model():\n    training_data, labels = [], []\n    files = [f for f in os.listdir(data_path) if f.endswith(('.jpg', '.png', '.jpeg'))]\n    if not files:\n        print(\"❌ ERROR: 'training_images' folder khali hai! Isme apni photos daalein.\")\n        return None\n    print(\"🔍 Status: Extracting faces and Training...\")\n    valid_filenames = []",
-        "detail": "attendance_system",
-        "documentation": {}
-    },
-    {
-        "label": "model",
-        "kind": 5,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "model = cv2.face.LBPHFaceRecognizer_create()\ndef train_model():\n    training_data, labels = [], []\n    files = [f for f in os.listdir(data_path) if f.endswith(('.jpg', '.png', '.jpeg'))]\n    if not files:\n        print(\"❌ ERROR: 'training_images' folder khali hai! Isme apni photos daalein.\")\n        return None\n    print(\"🔍 Status: Extracting faces and Training...\")\n    valid_filenames = []\n    for i, file in enumerate(files):",
-        "detail": "attendance_system",
-        "documentation": {}
-    },
-    {
-        "label": "filenames",
-        "kind": 5,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "filenames = train_model()\n# Agar training fail hui toh project stop kar do\nif filenames is None:\n    print(\"System setup failed. Please check your training images.\")\n    exit()\ndef markAttendance(name):\n    if not os.path.exists('attendance.csv'):\n        with open('attendance.csv', 'w') as f:\n            f.write(\"Name,Time,Date\\n\")\n    with open('attendance.csv', 'r+') as f:",
-        "detail": "attendance_system",
-        "documentation": {}
-    },
-    {
-        "label": "cap",
-        "kind": 5,
-        "importPath": "attendance_system",
-        "description": "attendance_system",
-        "peekOfCode": "cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)\nwhile True:\n    ret, frame = cap.read()\n    if not ret: break\n    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n    faces = face_classifier.detectMultiScale(gray, 1.3, 5)\n    for (x, y, w, h) in faces:\n        face_roi = cv2.resize(gray[y:y+h, x:x+w], (200, 200))\n        id, confidence = model.predict(face_roi)\n        # Confidence score print for debugging",
-        "detail": "attendance_system",
+        "label": "AttendanceSystem",
+        "kind": 6,
+        "importPath": "attendance_sys",
+        "description": "attendance_sys",
+        "peekOfCode": "class AttendanceSystem:\n    def __init__(self, root):\n        self.root = root\n        self.root.title(\"Advanced AI Attendance System\")\n        self.root.geometry(\"800x600\")\n        self.root.configure(bg=\"#2c3e50\")\n        # Load Models\n        self.face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')\n        self.model = cv2.face.LBPHFaceRecognizer_create()\n        self.create_ui()",
+        "detail": "attendance_sys",
         "documentation": {}
     }
 ]
