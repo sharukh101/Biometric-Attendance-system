@@ -2,3 +2,4 @@ flask
 opencv-contrib-python
 numpy
 pandas
+gunicorn
