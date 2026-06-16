@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Attendance System</title>
+    <!-- Google Fonts: Outfit (For Headers) & Inter (For UI Text) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Link Custom Premium Stylesheet (Relative path for 'Go Live' server) -->
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- ================= SIDEBAR ================= -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                        <path d="M12 6v6l4 2" />
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>Biometric Attendance</h2>
+                    <span>COLLEGE PROJECT</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" id="btn-tab-dashboard" data-tab="tab-dashboard">
+                    <span class="menu-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="9" />
+                            <rect x="14" y="3" width="7" height="5" />
+                            <rect x="14" y="12" width="7" height="9" />
+                            <rect x="3" y="16" width="7" height="5" />
+                        </svg>
+                    </span>
+                    <span class="menu-label">Dashboard</span>
+                </a>
+
+                <a href="#" class="menu-item" id="btn-tab-register" data-tab="tab-register">
+                    <span class="menu-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="8.5" cy="7" r="4" />
+                            <line x1="20" y1="8" x2="20" y2="14" />
+                            <line x1="17" y1="11" x2="23" y2="11" />
+                        </svg>
+                    </span>
+                    <span class="menu-label">Student Registration</span>
+                </a>
+
+                <a href="#" class="menu-item" id="btn-tab-attendance" data-tab="tab-attendance">
+                    <span class="menu-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                    </span>
+                    <span class="menu-label">Mark Attendance</span>
+                </a>
+
+                <a href="#" class="menu-item" id="btn-tab-records" data-tab="tab-records">
+                    <span class="menu-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                    </span>
+                    <span class="menu-label">Attendance Records</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="pulse-dot active"></span>
+                    <span class="status-text">Server Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= MAIN CONTENT ================= -->
+        <main class="main-content">
+
+            <!-- HEADER / TOP BAR -->
+            <header class="topbar">
+                <div class="topbar-title">
+                    <h1 id="page-title">Dashboard Overview</h1>
+                </div>
+                <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
+                    <button id="theme-toggle" class="btn-theme-toggle" aria-label="Toggle Theme">
+                        <!-- Sun icon for light mode (visible in dark mode) -->
+                        <svg id="sun-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                        <!-- Moon icon for dark mode (visible in light mode) -->
+                        <svg id="moon-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </button>
+                    <div class="live-clock" id="live-clock">--:--:-- | --/--/----</div>
+                </div>
+            </header>
+
+            <div class="content-body">
+
+                <!-- 1. DASHBOARD VIEW -->
+                <section id="tab-dashboard" class="tab-panel active">
+                    <div class="stats-grid">
+                        <div class="stats-card card-glow-purple">
+                            <div class="card-icon icon-purple">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                            </div>
+                            <div class="card-details">
+                                <h3 id="stat-total-students">0</h3>
+                                <p>Total Registered Students</p>
+                            </div>
+                        </div>
+
+                        <div class="stats-card card-glow-green">
+                            <div class="card-icon icon-green">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg>
+                            </div>
+                            <div class="card-details">
+                                <h3 id="stat-marked-today">0</h3>
+                                <p>Present Today</p>
+                            </div>
+                        </div>
+
+                        <div class="stats-card card-glow-blue">
+                            <div class="card-icon icon-blue">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                                    <line x1="6" y1="6" x2="6.01" y2="6" />
+                                    <line x1="6" y1="18" x2="6.01" y2="18" />
+                                </svg>
+                            </div>
+                            <div class="card-details">
+                                <h3 id="stat-scanner-status">Offline</h3>
+                                <p>Webcam Monitor Status</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-split">
+                        <div class="recent-card glass-panel">
+                            <div class="panel-header">
+                                <h2>Recent Marked Attendance</h2>
+                                <a href="#" onclick="switchTab('tab-records'); return false;" class="view-all-link">View All</a>
+                            </div>
+                            <div class="table-container compact">
+                                <table id="table-recent-attendance">
+                                    <thead>
+                                        <tr>
+                                            <th>Student Name</th>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="3" class="no-records">Loading records...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="recent-card glass-panel">
+                            <div class="panel-header">
+                                <h2>Registered Students</h2>
+                                <a href="#" onclick="switchTab('tab-register'); return false;" class="view-all-link">Register New</a>
+                            </div>
+                            <div class="student-pill-list" id="dashboard-student-list">
+                                <div class="no-records">No students registered yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. STUDENT REGISTRATION VIEW -->
+                <section id="tab-register" class="tab-panel">
+                    <div class="registration-layout">
+
+                        <!-- Left Panel: Form & Actions -->
+                        <div class="glass-panel registration-form-card">
+                            <div class="panel-header">
+                                <h2>Student Details</h2>
+                                <p>Enter the student name, email, and class, and click "Open Camera & Register Face" to
+                                    start the live preview. When you are ready, click "Capture Snapshot" once for each
+                                    angle (Straight, Left, Right) to take 3 photos, then click "Register".</p>
+                            </div>
+
+                            <div class="form-container">
+                                <div class="input-group">
+                                    <label for="reg-student-name">Student Full Name *</label>
+                                    <input type="text" id="reg-student-name" placeholder="E.g., RAJESH KUMAR"
+                                        autocomplete="off">
+                                </div>
+                                <div class="input-group" style="margin-top: 15px;">
+                                    <label for="reg-student-email">Email Address *</label>
+                                    <input type="email" id="reg-student-email" placeholder="E.g., rajesh@example.com"
+                                        autocomplete="off">
+                                </div>
+                                <div class="input-group" style="margin-top: 15px;">
+                                    <label for="reg-student-class">Class/Semester *</label>
+                                    <input type="text" id="reg-student-class" placeholder="E.g., B.TECH CSE 3RD YEAR"
+                                        autocomplete="off">
+                                </div>
+
+                                <div class="registration-actions"
+                                    style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                                    <button type="button" id="btn-toggle-reg-camera"
+                                        class="btn btn-primary btn-glow-purple">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path
+                                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                            <circle cx="12" cy="13" r="4" />
+                                        </svg>
+                                        Open Camera & Register Face
+                                    </button>
+                                    <button type="button" id="btn-capture-photo" class="btn btn-success btn-glow-green"
+                                        style="display: none;">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                        Capture Snapshots
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Camera Preview Screen -->
+                        <div class="glass-panel registration-camera-card" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="camera-screen-container" id="reg-camera-screen-container"
+                                style="height: 260px; min-height: 260px;">
+                                <div class="camera-overlay">
+                                    <div class="scanline"></div>
+                                    <div class="corner-bracket top-left"></div>
+                                    <div class="corner-bracket top-right"></div>
+                                    <div class="corner-bracket bottom-left"></div>
+                                    <div class="corner-bracket bottom-right"></div>
+                                </div>
+
+                                <img id="reg-camera-feed" class="camera-feed-img" src="" alt="Webcam Feed">
+
+                                <div class="camera-placeholder" id="reg-camera-placeholder">
+                                    <div class="placeholder-icon animate-float">
+                                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none"
+                                            stroke="currentColor" stroke-width="1.5">
+                                            <path
+                                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                            <circle cx="12" cy="13" r="4" />
+                                        </svg>
+                                    </div>
+                                    <h3>Camera Feed Offline</h3>
+                                    <p>Enter details and open camera on the left to show live viewfinder.</p>
+                                </div>
+                            </div>
+
+                            <div class="terminal-log-container" style="margin-top: 5px;">
+                                <div class="terminal-header">
+                                    <div class="terminal-dots">
+                                        <span class="dot red"></span>
+                                        <span class="dot yellow"></span>
+                                        <span class="dot green"></span>
+                                    </div>
+                                    <span class="terminal-title">Registration Activity Log</span>
+                                </div>
+                                <div class="terminal-log" id="register-log" style="height: 120px;">
+                                    <div class="log-line text-muted">[SYSTEM] Enter student name, email, and class and click "Open Camera" to begin.</div>
+                                </div>
+                            </div>
+
+                            <button type="button" id="btn-confirm-register"
+                                class="btn btn-primary btn-glow-purple"
+                                style="display: none; background: linear-gradient(135deg, #8b5cf6, #3b82f6); border-color: transparent; width: 100%;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+                                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                Register
+                            </button>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- 3. MARK ATTENDANCE VIEW -->
+                <section id="tab-attendance" class="tab-panel">
+                    <div class="attendance-layout">
+
+                        <!-- Webcam Feed Frame -->
+                        <div class="camera-monitor-card glass-panel">
+                            <div class="camera-screen-container" id="camera-screen-container">
+
+                                <!-- Scanlines and Corner Brackets for premium sci-fi overlay -->
+                                <div class="camera-overlay">
+                                    <div class="scanline"></div>
+                                    <div class="corner-bracket top-left"></div>
+                                    <div class="corner-bracket top-right"></div>
+                                    <div class="corner-bracket bottom-left"></div>
+                                    <div class="corner-bracket bottom-right"></div>
+                                </div>
+
+                                <!-- Webcam image stream -->
+                                <img id="camera-feed" class="camera-feed-img" src="" alt="Webcam Feed">
+
+                                <!-- Offline View State -->
+                                <div class="camera-placeholder" id="camera-placeholder">
+                                    <div class="placeholder-icon animate-float">
+                                        <svg viewBox="0 0 24 24" width="64" height="64" fill="none"
+                                            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path
+                                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                            <circle cx="12" cy="13" r="4" />
+                                            <line x1="1" y1="1" x2="23" y2="23" stroke="#e74c3c" stroke-width="2" />
+                                        </svg>
+                                    </div>
+                                    <h3>Webcam Monitor Offline</h3>
+                                    <p>Face detection is currently in standby mode. Click 'Start Attendance Scanning'
+                                        below to launch the camera feed.</p>
+                                </div>
+                            </div>
+
+                            <div class="camera-controls">
+                                <button id="btn-start-scanning" class="btn btn-success btn-glow-green">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3" />
+                                    </svg>
+                                    Start Attendance Scanning
+                                </button>
+                                <button id="btn-stop-scanning" class="btn btn-danger btn-glow-red" disabled>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                                    </svg>
+                                    Stop Scanning & Release Camera
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Side panel for today's logs -->
+                        <div class="attendance-sidebar-logs glass-panel">
+                            <div class="panel-header">
+                                <h2>Today's Attendance</h2>
+                                <span class="badge badge-green" id="today-log-count">0 Present</span>
+                            </div>
+                            <div class="log-timeline-container" id="attendance-timeline">
+                                <div class="timeline-empty">Start camera to see live scans.</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- 4. ATTENDANCE RECORDS VIEW -->
+                <section id="tab-records" class="tab-panel">
+                    <div class="glass-panel">
+                        <div class="panel-header flex-header">
+                            <div>
+                                <h2>Logs & Attendance Database</h2>
+                                <p>Search and filter registered check-ins logged by the facial recognition device.</p>
+                            </div>
+                            <button id="btn-refresh-records" class="btn btn-secondary">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                                </svg>
+                                Refresh Data
+                            </button>
+                        </div>
+
+                        <div class="records-filter-row">
+                            <div class="search-input-wrapper">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" id="records-search" placeholder="Search by student name...">
+                            </div>
+
+                            <div class="filter-inputs">
+                                <input type="date" id="records-date-filter" class="filter-date-input">
+                                <button id="btn-clear-filters" class="btn btn-text">Clear Filters</button>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table id="table-full-records">
+                                <thead>
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>Date Logged</th>
+                                        <th>Time Registered</th>
+                                        <th>Status Badge</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-records-body">
+                                    <tr>
+                                        <td colspan="4" class="no-records">Loading attendance records...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Include Javascript Architecture (Relative path for 'Go Live' server) -->
+    <script src="static/js/app.js"></script>
+</body>
+
+</html>
