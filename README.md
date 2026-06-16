@@ -415,9 +415,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👨‍💻 Author
 
-**Sharukh Ahmed**
-
-- GitHub: [@sharukh101](https://github.com/sharukh101)
+**Sharukh Malik**
 - Project: [Biometric-Attendance-system](https://github.com/sharukh101/Biometric-Attendance-system)
 
 ---
@@ -450,6 +448,6 @@ For issues, questions, or suggestions, please:
 
 ---
 
-**Made with ❤️ by Sharukh Ahmed**
+**Made with ❤️ by Sharukh Malik**
 
 ⭐ If you find this project useful, please consider giving it a star!
