@@ -1,17 +1,34 @@
 /* ==========================================================================
-   ADVANCED AI ATTENDANCE SYSTEM - FRONTEND INTERACTIVE ENGINE
+   ADVANCED AI ATTENDANCE SYSTEM - FRONTEND INTERACTIVE ENGINE (WITH PYTHON BACKEND INLINE)
    ========================================================================== */
 
 // Global State
+const API_BASE = "http://127.0.0.1:5000";
 let globalRecords = [];
-let timelineIntervalId = null;
+let modelsLoaded = false;
+let activeCameraStream = null;
+let regLoopActive = false;
+let scanLoopActive = false;
+let faceMatcher = null;
+let capturedDescriptors = []; // Holds 3 Float32Array descriptors for registration
+let capturedImages = [];      // Holds 3 cropped Base64 face images for registration
+let registrationStep = 1;
 
-// Detect if running on a different port than Flask (5000), and dynamically construct the server URL using the current host, or fallback to localhost:5000
-const API_BASE = window.location.port === '5000' 
-    ? '' 
-    : (window.location.hostname ? `${window.location.protocol}//${window.location.hostname}:5000` : 'http://localhost:5000');
+// Public jsDelivr CDN model weight endpoints (with fallbacks)
+const MODEL_URLS = [
+    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+    'https://justadudewhohacks.github.io/face-api.js/models'
+];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize Local Storage Databases if they don't exist
+    if (!localStorage.getItem('students')) {
+        localStorage.setItem('students', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('attendance')) {
+        localStorage.setItem('attendance', JSON.stringify([]));
+    }
+
     // 1. Initialize Clock
     startLiveClock();
 
@@ -24,22 +41,158 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Bind Camera Stream Controls
     initCameraScanner();
 
-    // 5. Bind Records Filters
+    // 5. Bind Records Filters and Actions
     initRecordsDatabase();
 
     // 6. Initialize Theme Toggle
     initThemeToggle();
 
-    // 7. Restore active tab or default to dashboard
+    // 7. Update status indicator to pending
+    updateStatusIndicator("AI Initializing...", "pending");
+
+    // 8. Pre-load face-api models in the background
+    await loadModelsBackground();
+
+    // 9. Synchronize with Python Flask Backend if online
+    await syncWithBackend();
+
+    // 10. Restore active tab or default to dashboard
     const savedTab = localStorage.getItem('activeTab') || 'tab-dashboard';
     switchTab(savedTab);
 });
+
+/* ==========================================================================
+   BACKEND SYNCHRONIZATION UTILITY
+   ========================================================================== */
+async function syncWithBackend() {
+    try {
+        // Try fetching registered students from Flask server
+        const res = await fetch(`${API_BASE}/api/students`);
+        if (res.ok) {
+            const backendStudents = await res.json();
+            localStorage.setItem('students', JSON.stringify(backendStudents));
+        }
+
+        // Try fetching attendance logs from Flask server
+        const res2 = await fetch(`${API_BASE}/api/attendance_records`);
+        if (res2.ok) {
+            const backendAttendance = await res2.json();
+            localStorage.setItem('attendance', JSON.stringify(backendAttendance));
+        }
+        
+        updateStatusIndicator("AI Engine Ready (Connected)", "success");
+        console.log("Synchronized successfully with Python Flask backend.");
+    } catch (err) {
+        console.warn("Python backend offline. Running in Local Storage Mode.");
+        updateStatusIndicator("AI Engine Ready (Local)", "success");
+    }
+}
+
+/* ==========================================================================
+   STATUS INDICATOR HELPER
+   ========================================================================== */
+function updateStatusIndicator(text, state) {
+    const textEl = document.querySelector('.status-indicator .status-text');
+    const dotEl = document.querySelector('.status-indicator .pulse-dot');
+    if (!textEl || !dotEl) return;
+    
+    textEl.textContent = text;
+    dotEl.style.animation = 'none'; // Stop current CSS animation
+    
+    if (state === 'success') {
+        dotEl.style.backgroundColor = 'hsl(var(--accent-green))';
+        dotEl.style.boxShadow = '0 0 10px hsl(var(--accent-green))';
+        dotEl.style.animation = 'pulse 1.8s infinite';
+    } else if (state === 'pending') {
+        dotEl.style.backgroundColor = 'hsl(var(--accent-blue))';
+        dotEl.style.boxShadow = '0 0 10px hsl(var(--accent-blue))';
+        dotEl.style.animation = 'pulse 1.8s infinite';
+    } else if (state === 'error') {
+        dotEl.style.backgroundColor = 'hsl(var(--accent-red))';
+        dotEl.style.boxShadow = '0 0 10px hsl(var(--accent-red))';
+        dotEl.style.animation = 'none';
+    } else {
+        dotEl.style.backgroundColor = 'hsl(var(--text-muted))';
+        dotEl.style.boxShadow = 'none';
+        dotEl.style.animation = 'none';
+    }
+}
+
+/* ==========================================================================
+   MODEL LOADER (WITH CDN FALLBACK)
+   ========================================================================== */
+async function loadModels(logFn = console.log) {
+    if (modelsLoaded) return;
+    
+    // Attempt loading from preferred URL, fallback to secondary if failure occurs
+    for (let i = 0; i < MODEL_URLS.length; i++) {
+        const url = MODEL_URLS[i];
+        logFn(`[SYSTEM] Loading AI models from CDN source ${i + 1}...`);
+        try {
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(url);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(url);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(url);
+            modelsLoaded = true;
+            logFn("[SYSTEM] AI models loaded successfully!");
+            return;
+        } catch (err) {
+            console.warn(`Failed loading models from ${url}:`, err);
+            if (i === MODEL_URLS.length - 1) {
+                logFn("[ERROR] Failed to load AI models from all sources. Please check internet connection.");
+                throw err;
+            }
+        }
+    }
+}
+
+async function loadModelsBackground() {
+    try {
+        await loadModels();
+    } catch (err) {
+        updateStatusIndicator("AI Load Error", "error");
+    }
+}
+
+/* ==========================================================================
+   WEBCAM HELPER UTILITIES
+   ========================================================================== */
+async function startWebcam(videoElement) {
+    if (activeCameraStream) {
+        stopWebcam();
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Webcam access requires a secure context (HTTPS or localhost/127.0.0.1). Please launch the project using VS Code's 'Go Live' server or Python Flask server, rather than opening the HTML file directly as a local file.");
+    }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: "user"
+            }
+        });
+        videoElement.srcObject = stream;
+        activeCameraStream = stream;
+        return stream;
+    } catch (err) {
+        console.error("Camera access failed:", err);
+        throw err;
+    }
+}
+
+function stopWebcam() {
+    if (activeCameraStream) {
+        activeCameraStream.getTracks().forEach(track => track.stop());
+        activeCameraStream = null;
+    }
+}
 
 /* ==========================================================================
    WIDGET: LIVE CLOCK & CALENDAR
    ========================================================================== */
 function startLiveClock() {
     const clockElement = document.getElementById('live-clock');
+    if (!clockElement) return;
     
     function tick() {
         const now = new Date();
@@ -80,7 +233,7 @@ function initNavigation() {
     });
 }
 
-function switchTab(tabId) {
+async function switchTab(tabId) {
     // Deactivate all menu items
     const menuItems = document.querySelectorAll('.menu-item');
     menuItems.forEach(item => {
@@ -103,6 +256,19 @@ function switchTab(tabId) {
 
     // Persist active tab to localStorage
     localStorage.setItem('activeTab', tabId);
+
+    // Stop loops when leaving active webcam views
+    if (tabId !== 'tab-register' && regLoopActive) {
+        const btnToggleCam = document.getElementById('btn-toggle-reg-camera');
+        if (btnToggleCam) btnToggleCam.click(); // Programmatically stop registration webcam stream
+    }
+    if (tabId !== 'tab-attendance' && scanLoopActive) {
+        const btnStop = document.getElementById('btn-stop-scanning');
+        if (btnStop) btnStop.click(); // Programmatically stop attendance webcam stream
+    }
+
+    // Sync database state with backend when loading views
+    await syncWithBackend();
 
     // Update Topbar Title Header
     const pageTitle = document.getElementById('page-title');
@@ -131,59 +297,56 @@ function switchTab(tabId) {
    TAB 1: DASHBOARD ENGINE
    ========================================================================== */
 function loadDashboardData() {
-    // Load general counts
-    fetch(`${API_BASE}/api/stats`)
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('stat-total-students').textContent = data.total_students;
-            document.getElementById('stat-marked-today').textContent = data.marked_today;
-            
-            const scannerStatus = document.getElementById('stat-scanner-status');
-            if (data.camera_active) {
-                scannerStatus.textContent = "Scanning Live";
-                scannerStatus.parentElement.parentElement.className = "stats-card card-glow-green";
-            } else {
-                scannerStatus.textContent = "Offline";
-                scannerStatus.parentElement.parentElement.className = "stats-card card-glow-blue";
-            }
-        })
-        .catch(err => console.error("Error fetching stats:", err));
+    const students = JSON.parse(localStorage.getItem('students')) || [];
+    const attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+    
+    // Calculate today's marked attendance
+    const today = getTodayFormattedString();
+    const todayAttendanceCount = attendance.filter(log => log.Date === today).length;
 
-    // Load registered students list
-    fetch(`${API_BASE}/api/students`)
-        .then(res => res.json())
-        .then(students => {
-            const listContainer = document.getElementById('dashboard-student-list');
-            listContainer.innerHTML = '';
-            
-            if (students.length === 0) {
-                listContainer.innerHTML = '<div class="no-records">No students registered yet.</div>';
-                return;
-            }
-            
+    // Load general counts
+    document.getElementById('stat-total-students').textContent = students.length;
+    document.getElementById('stat-marked-today').textContent = todayAttendanceCount;
+    
+    const scannerStatus = document.getElementById('stat-scanner-status');
+    if (scannerStatus) {
+        if (scanLoopActive) {
+            scannerStatus.textContent = "Scanning Live";
+            scannerStatus.parentElement.parentElement.className = "stats-card card-glow-green";
+        } else {
+            scannerStatus.textContent = "Offline";
+            scannerStatus.parentElement.parentElement.className = "stats-card card-glow-blue";
+        }
+    }
+
+    // Load registered students list (pills)
+    const listContainer = document.getElementById('dashboard-student-list');
+    if (listContainer) {
+        listContainer.innerHTML = '';
+        
+        if (students.length === 0) {
+            listContainer.innerHTML = '<div class="no-records">No students registered yet.</div>';
+        } else {
             students.forEach(student => {
                 const pill = document.createElement('div');
                 pill.className = 'student-pill animate-fade';
-                pill.textContent = student;
+                pill.textContent = student.name;
                 listContainer.appendChild(pill);
             });
-        })
-        .catch(err => console.error("Error loading students:", err));
+        }
+    }
 
     // Load compact activity log (recent 5 logs)
-    fetch(`${API_BASE}/api/attendance_records`)
-        .then(res => res.json())
-        .then(records => {
-            const tbody = document.querySelector('#table-recent-attendance tbody');
-            tbody.innerHTML = '';
-            
-            if (records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="no-records">No attendance logged yet.</td></tr>';
-                return;
-            }
-            
-            // Slice the first 5 records (newest)
-            const recent = records.slice(0, 5);
+    const tbody = document.querySelector('#table-recent-attendance tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        
+        if (attendance.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="no-records">No attendance logged yet.</td></tr>';
+        } else {
+            // Sort attendance with newest logged at the top
+            const sortedRecords = [...attendance].reverse();
+            const recent = sortedRecords.slice(0, 5);
             recent.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -193,12 +356,8 @@ function loadDashboardData() {
                 `;
                 tbody.appendChild(tr);
             });
-        })
-        .catch(err => {
-            const tbody = document.querySelector('#table-recent-attendance tbody');
-            tbody.innerHTML = '<tr><td colspan="3" class="no-records text-danger">Failed to connect to database!</td></tr>';
-            console.error("Error loading recent records:", err);
-        });
+        }
+    }
 }
 
 /* ==========================================================================
@@ -225,13 +384,12 @@ function initRegistration() {
     });
     
     const container = document.getElementById('reg-camera-screen-container');
-    const imgFeed = document.getElementById('reg-camera-feed');
+    const videoFeed = document.getElementById('reg-camera-feed');
+    const canvasOverlay = document.getElementById('reg-camera-canvas');
     const placeholder = document.getElementById('reg-camera-placeholder');
 
-    let cameraRunning = false;
-    let currentStep = 1;
-
     function addLog(text, styleClass = '') {
+        if (!logBox) return;
         const line = document.createElement('div');
         line.className = `log-line ${styleClass}`;
         
@@ -244,8 +402,8 @@ function initRegistration() {
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    btnToggleCam.addEventListener('click', () => {
-        if (!cameraRunning) {
+    btnToggleCam.addEventListener('click', async () => {
+        if (!regLoopActive) {
             const name = input.value.trim().toUpperCase();
             const email = inputEmail.value.trim();
             const className = inputClass.value.trim().toUpperCase();
@@ -253,184 +411,203 @@ function initRegistration() {
                 addLog('[ERROR] Name, Email, and Class/Semester are all compulsory before starting registration!', 'error');
                 return;
             }
-            startRegCamera(name);
+            
+            // Check if name is already registered
+            const students = JSON.parse(localStorage.getItem('students')) || [];
+            const exists = students.some(s => s.name === name);
+            if (exists) {
+                addLog(`[WARNING] Student '${name}' is already registered. Re-registering will overwrite their existing face data.`, 'highlight');
+            }
+
+            await startRegCamera(name);
         } else {
             stopRegCamera();
         }
     });
 
-    btnCapture.addEventListener('click', () => {
+    btnCapture.addEventListener('click', async () => {
+        const name = input.value.trim().toUpperCase();
+        if (!name) return;
+        await captureSingleStep(name);
+    });
+
+    btnConfirm.addEventListener('click', async () => {
         const name = input.value.trim().toUpperCase();
         const email = inputEmail.value.trim();
         const className = inputClass.value.trim().toUpperCase();
+        
         if (!name || !email || !className) {
             addLog('[ERROR] All fields (Name, Email, Class) are compulsory!', 'error');
             return;
         }
-        captureSingleStep(name);
-    });
-
-    btnConfirm.addEventListener('click', () => {
-        const name = input.value.trim().toUpperCase();
-        const email = inputEmail.value.trim();
-        const className = inputClass.value.trim().toUpperCase();
-        if (!name || !email || !className) {
-            addLog('[ERROR] All fields (Name, Email, Class) are compulsory!', 'error');
+        if (capturedDescriptors.length < 3) {
+            addLog('[ERROR] Missing facial descriptors. Capture all 3 angles first!', 'error');
             return;
         }
 
         btnConfirm.disabled = true;
-        addLog(`[SYSTEM] Registering student and training model for: ${name}...`, 'highlight');
+        addLog(`[SYSTEM] Finalizing registration and storing profiles...`, 'highlight');
 
-        fetch(`${API_BASE}/api/finalize_registration`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, email: email, class_name: className })
-        })
-        .then(res => {
-            if (!res.ok) {
-                return res.json().then(body => { throw new Error(body.message || 'Registration failed'); });
+        try {
+            const newStudent = {
+                name: name,
+                email: email,
+                class_name: className,
+                descriptors: capturedDescriptors,
+                images: capturedImages
+            };
+
+            // 1. Save to Python Flask backend
+            let savedOnBackend = false;
+            try {
+                const response = await fetch(`${API_BASE}/api/register_student`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newStudent)
+                });
+                if (response.ok) {
+                    savedOnBackend = true;
+                    addLog(`[PYTHON] Profile successfully saved to students.csv!`, 'success');
+                    addLog(`[PYTHON] Facial JPEGs written inside static/registered_faces/!`, 'success');
+                }
+            } catch (backendErr) {
+                console.warn("Backend offline. Saving in Local Storage Mode.", backendErr);
             }
-            return res.json();
-        })
-        .then(body => {
-            addLog(`[MODEL] LBPH Recognizer trained with the 3 snapshots successfully!`, 'success');
-            addLog(`[SUCCESS] Registered '${name}' in the database successfully!`, 'success');
+
+            // 2. Sync client-side fallback
+            let students = JSON.parse(localStorage.getItem('students')) || [];
+            students = students.filter(s => s.name !== name);
+            students.push(newStudent);
+            localStorage.setItem('students', JSON.stringify(students));
             
-            // Show premium bottom-right success Toast popup notification
-            showToast('Registered Successfully', `'${name}' has been enrolled in the facial database.`);
+            if (!savedOnBackend) {
+                addLog(`[WARNING] Backend server offline. Registered locally in browser storage.`, 'highlight');
+            }
+
+            addLog(`[SUCCESS] Registered '${name}' in database successfully!`, 'success');
+            showToast('Registered Successfully', `'${name}' has been enrolled in the database.`);
             
-            input.value = ''; // Reset input
+            // Clear fields and close camera
+            input.value = '';
             inputEmail.value = '';
             inputClass.value = '';
             stopRegCamera();
-        })
-        .catch(err => {
+            
+            await syncWithBackend();
+            loadDashboardData();
+        } catch (err) {
             btnConfirm.disabled = false;
             addLog(`[ERROR] Registration failed: ${err.message}`, 'error');
-        });
+        }
     });
 
-    function captureSingleStep(name) {
-        if (!cameraRunning) return;
-        
-        let step = currentStep;
-        let ordinal = step === 1 ? "1st" : (step === 2 ? "2nd" : "3rd");
-        let angleDesc = step === 1 ? "Look Straight" : (step === 2 ? "Turn Left" : "Turn Right");
-        
-        btnCapture.disabled = true;
-        btnToggleCam.disabled = true;
-        addLog(`[SYSTEM] Capturing ${ordinal} snapshot (${angleDesc}). Please keep still...`);
-        
-        fetch(`${API_BASE}/api/capture_snap`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, step: step })
-        })
-        .then(res => {
-            if (!res.ok) {
-                return res.json().then(body => { throw new Error(body.message || 'Capture failed'); });
-            }
-            return res.json();
-        })
-        .then(body => {
-            if (!cameraRunning) return;
-            
-            addLog(`[CAMERA] ${body.message}`, 'success');
-            
-            if (step === 3) {
-                btnCapture.disabled = true;
-                btnConfirm.disabled = false;
-                btnToggleCam.disabled = false;
-                btnCapture.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 8 8 12 12 16"/>
-                        <line x1="16" y1="12" x2="8" y2="12"/>
-                    </svg>
-                    Snapshots Completed
-                `;
-                addLog('[SYSTEM] All 3 snapshots captured successfully! Click "Register" below to finish enrollment.', 'highlight');
-            } else {
-                currentStep = step + 1;
-                btnCapture.disabled = false;
-                btnToggleCam.disabled = false;
-                
-                let nextAngle = currentStep === 2 ? "Turn Left" : "Turn Right";
-                btnCapture.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                    Capture Snapshot (${currentStep}/3) - ${nextAngle}
-                `;
-                addLog(`[SYSTEM] Snapshot ${step}/3 captured! Turn face slightly ${currentStep === 2 ? 'LEFT' : 'RIGHT'} and click "Capture" again.`, 'highlight');
-            }
-        })
-        .catch(err => {
-            if (!cameraRunning) return;
-            btnCapture.disabled = false;
-            btnToggleCam.disabled = false;
-            addLog(`[ERROR] Snapshot failed at step ${step}: ${err.message}`, 'error');
-            addLog(`[SYSTEM] Please adjust your position and click "Capture" again to retry for snapshot ${step}.`, 'highlight');
-        });
-    }
-
-    function startRegCamera(name) {
+    async function startRegCamera(name) {
         input.disabled = true;
         inputEmail.disabled = true;
         inputClass.disabled = true;
-        currentStep = 1;
+        registrationStep = 1;
+        capturedDescriptors = [];
+        capturedImages = [];
         
-        // Viewport UI toggles
-        placeholder.style.display = 'none';
-        imgFeed.style.display = 'block';
-        container.classList.add('streaming');
+        logBox.innerHTML = ''; // Reset logs
+        addLog('[CAMERA] Starting camera preview feed...');
         
-        imgFeed.src = `${API_BASE}/register_feed`;
-        cameraRunning = true;
- 
-        btnToggleCam.innerHTML = `
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-            </svg>
-            Close Camera Preview
-        `;
-        btnToggleCam.className = "btn btn-danger";
- 
-        // Setup capture button (visible and enabled, with straight angle prompt)
-        btnCapture.style.display = 'inline-flex';
-        btnCapture.disabled = false;
-        btnCapture.innerHTML = `
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="3"/>
-            </svg>
-            Capture Snapshot (1/3) - Look Straight
-        `;
- 
-        // Setup confirm/register button (visible but disabled initially)
-        btnConfirm.style.display = 'inline-flex';
-        btnConfirm.disabled = true;
- 
-        logBox.innerHTML = ''; // reset logs
-        addLog('[CAMERA] Webcam viewfinder turned online successfully.');
-        addLog('[SYSTEM] Please look straight at the camera and click "Capture Snapshot (1/3)" to begin.', 'highlight');
+        // Ensure models are loaded
+        if (!modelsLoaded) {
+            updateStatusIndicator("AI Initializing...", "pending");
+            try {
+                await loadModels(text => addLog(text, 'highlight'));
+                await syncWithBackend();
+            } catch (modelErr) {
+                updateStatusIndicator("AI Load Error", "error");
+                addLog(`[ERROR] AI models loading failed: ${modelErr.message}. Check your internet connection.`, 'error');
+                input.disabled = false;
+                inputEmail.disabled = false;
+                inputClass.disabled = false;
+                stopRegCamera();
+                return;
+            }
+        }
+        
+        // Initialize Webcam
+        try {
+            await startWebcam(videoFeed);
+        } catch (camErr) {
+            updateStatusIndicator("Camera Error", "error");
+            addLog(`[ERROR] Webcam access denied or failed: ${camErr.message}`, 'error');
+            input.disabled = false;
+            inputEmail.disabled = false;
+            inputClass.disabled = false;
+            stopRegCamera();
+            return;
+        }
+
+        try {
+            // UI Visual States
+            placeholder.style.display = 'none';
+            videoFeed.style.display = 'block';
+            canvasOverlay.style.display = 'block';
+            container.classList.add('streaming');
+            
+            regLoopActive = true;
+            runRegistrationLoop();
+            
+            btnToggleCam.innerHTML = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                </svg>
+                Close Camera Preview
+            `;
+            btnToggleCam.className = "btn btn-danger";
+            
+            // Setup capture button
+            btnCapture.style.display = 'inline-flex';
+            btnCapture.disabled = false;
+            btnCapture.innerHTML = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Capture Snapshot (1/3) - Look Straight
+            `;
+            
+            // Setup register button
+            btnConfirm.style.display = 'inline-flex';
+            btnConfirm.disabled = true;
+            
+            addLog('[CAMERA] Webcam viewfinder turned online successfully.');
+            addLog('[SYSTEM] Please look straight at the camera and click "Capture Snapshot (1/3)" to begin.', 'highlight');
+        } catch (err) {
+            addLog(`[ERROR] Registration startup failed: ${err.message}`, 'error');
+            input.disabled = false;
+            inputEmail.disabled = false;
+            inputClass.disabled = false;
+            stopRegCamera();
+        }
     }
 
     function stopRegCamera() {
-        imgFeed.src = '';
-        imgFeed.style.display = 'none';
+        regLoopActive = false;
+        stopWebcam();
+        
+        // Reset Video / Canvas View
+        videoFeed.srcObject = null;
+        videoFeed.style.display = 'none';
+        canvasOverlay.style.display = 'none';
+        const ctx = canvasOverlay.getContext('2d');
+        ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+        
         placeholder.style.display = 'flex';
         container.classList.remove('streaming');
- 
-        cameraRunning = false;
+        
+        // Reset form inputs
         input.disabled = false;
         inputEmail.disabled = false;
         inputClass.disabled = false;
- 
+        
+        // Reset action buttons
         btnToggleCam.innerHTML = `
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -439,19 +616,134 @@ function initRegistration() {
             Open Camera & Register Face
         `;
         btnToggleCam.className = "btn btn-primary btn-glow-purple";
- 
+        
         btnCapture.style.display = 'none';
         btnConfirm.style.display = 'none';
- 
-        const name = input.value.trim().toUpperCase();
-        fetch(`${API_BASE}/api/stop_register_camera`, { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name })
-        })
-            .then(res => res.json())
-            .then(data => console.log("Register camera stopped:", data.message))
-            .catch(err => console.error("Error releasing register camera:", err));
+        
+        addLog('[SYSTEM] Camera closed. Face registration standby.');
+    }
+
+    async function runRegistrationLoop() {
+        if (!regLoopActive || !activeCameraStream) return;
+        
+        if (videoFeed.paused || videoFeed.ended || videoFeed.offsetWidth === 0) {
+            requestAnimationFrame(runRegistrationLoop);
+            return;
+        }
+        
+        try {
+            const displaySize = { width: videoFeed.offsetWidth, height: videoFeed.offsetHeight };
+            faceapi.matchDimensions(canvasOverlay, displaySize);
+            
+            // Fast single face detection for visual feedback
+            const detection = await faceapi.detectSingleFace(videoFeed, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+                                              .withFaceLandmarks();
+            
+            const ctx = canvasOverlay.getContext('2d');
+            ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+            
+            if (detection) {
+                const resizedDetections = faceapi.resizeResults(detection, displaySize);
+                faceapi.draw.drawDetections(canvasOverlay, resizedDetections);
+            }
+        } catch (err) {
+            console.error("Error in registration visualization frame:", err);
+        }
+        
+        requestAnimationFrame(runRegistrationLoop);
+    }
+
+    async function captureSingleStep(name) {
+        if (!regLoopActive) return;
+        
+        let step = registrationStep;
+        let ordinal = step === 1 ? "1st" : (step === 2 ? "2nd" : "3rd");
+        let angleDesc = step === 1 ? "Look Straight" : (step === 2 ? "Turn Left" : "Turn Right");
+        
+        btnCapture.disabled = true;
+        btnToggleCam.disabled = true;
+        addLog(`[SYSTEM] Capturing ${ordinal} snapshot (${angleDesc}). Processing details...`, 'highlight');
+        
+        try {
+            // Detect face descriptor in current stream frame
+            const detection = await faceapi.detectSingleFace(videoFeed)
+                                              .withFaceLandmarks()
+                                              .withFaceDescriptor();
+                                              
+            if (!detection) {
+                addLog(`[ERROR] No face detected! Look directly at the camera at a proper angle and click capture again.`, 'error');
+                btnCapture.disabled = false;
+                btnToggleCam.disabled = false;
+                return;
+            }
+            
+            // Crop face image and convert to low-res base64 to save local storage space
+            try {
+                const box = detection.detection.box;
+                const faceCanvas = document.createElement('canvas');
+                faceCanvas.width = 150;
+                faceCanvas.height = 150;
+                const faceCtx = faceCanvas.getContext('2d');
+                
+                // Draw cropped face from video frame
+                faceCtx.drawImage(
+                    videoFeed,
+                    box.x, box.y, box.width, box.height,
+                    0, 0, 150, 150
+                );
+                const faceDataUrl = faceCanvas.toDataURL('image/jpeg', 0.75); // quality 0.75 is very lightweight
+                capturedImages.push(faceDataUrl);
+            } catch (cropErr) {
+                console.warn("Face crop failed, fallback to full video frame:", cropErr);
+                // Fallback to taking a small version of the entire frame
+                const faceCanvas = document.createElement('canvas');
+                faceCanvas.width = 150;
+                faceCanvas.height = 112;
+                const faceCtx = faceCanvas.getContext('2d');
+                faceCtx.drawImage(videoFeed, 0, 0, 150, 112);
+                capturedImages.push(faceCanvas.toDataURL('image/jpeg', 0.6));
+            }
+            
+            // Store descriptor serialized as array of numbers
+            const descArray = Array.from(detection.descriptor);
+            capturedDescriptors.push(descArray);
+            
+            addLog(`[CAMERA] Snapshot ${step}/3 captured successfully!`, 'success');
+            
+            if (step === 3) {
+                btnCapture.disabled = true;
+                btnConfirm.disabled = false;
+                btnToggleCam.disabled = false;
+                
+                btnCapture.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 8 8 12 12 16"/>
+                        <line x1="16" y1="12" x2="8" y2="12"/>
+                    </svg>
+                    Snapshots Completed
+                `;
+                addLog('[SYSTEM] All 3 snapshots captured successfully! Click "Register" below to save this profile.', 'highlight');
+            } else {
+                registrationStep = step + 1;
+                btnCapture.disabled = false;
+                btnToggleCam.disabled = false;
+                
+                let nextAngle = registrationStep === 2 ? "Turn Left" : "Turn Right";
+                btnCapture.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    Capture Snapshot (${registrationStep}/3) - ${nextAngle}
+                `;
+                addLog(`[SYSTEM] Snapshot ${step}/3 captured! Turn face slightly ${registrationStep === 2 ? 'LEFT' : 'RIGHT'} and click "Capture".`, 'highlight');
+            }
+        } catch (err) {
+            btnCapture.disabled = false;
+            btnToggleCam.disabled = false;
+            addLog(`[ERROR] Descriptor capture failed: ${err.message}`, 'error');
+        }
     }
 }
 
@@ -462,93 +754,251 @@ function initCameraScanner() {
     const btnStart = document.getElementById('btn-start-scanning');
     const btnStop = document.getElementById('btn-stop-scanning');
     const container = document.getElementById('camera-screen-container');
-    const imgFeed = document.getElementById('camera-feed');
+    const videoFeed = document.getElementById('camera-feed');
+    const canvasOverlay = document.getElementById('camera-canvas');
     const placeholder = document.getElementById('camera-placeholder');
 
-    btnStart.addEventListener('click', () => {
-        // Toggle Buttons
+    btnStart.addEventListener('click', async () => {
+        // Toggle scanner state
         btnStart.disabled = true;
         btnStop.disabled = false;
         
-        // Show Stream Feed
         placeholder.style.display = 'none';
-        imgFeed.style.display = 'block';
+        videoFeed.style.display = 'block';
+        canvasOverlay.style.display = 'block';
         container.classList.add('streaming');
         
-        // Set stream URL
-        imgFeed.src = `${API_BASE}/video_feed`;
+        // Ensure models are loaded
+        if (!modelsLoaded) {
+            updateStatusIndicator("AI Initializing...", "pending");
+            try {
+                await loadModels();
+            } catch (modelErr) {
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                placeholder.style.display = 'flex';
+                videoFeed.style.display = 'none';
+                canvasOverlay.style.display = 'none';
+                container.classList.remove('streaming');
+                updateStatusIndicator("AI Load Error", "error");
+                showToast("AI Load Error", "Failed to load face detection models. Please check your internet connection.");
+                return;
+            }
+        }
+        await syncWithBackend();
         
-        // Start timeline log pooling every 3 seconds to fetch new check-ins
-        loadTimelineLogs();
-        timelineIntervalId = setInterval(loadTimelineLogs, 3000);
+        // Start Webcam
+        try {
+            await startWebcam(videoFeed);
+        } catch (camErr) {
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            placeholder.style.display = 'flex';
+            videoFeed.style.display = 'none';
+            canvasOverlay.style.display = 'none';
+            container.classList.remove('streaming');
+            updateStatusIndicator("Camera Error", "error");
+            showToast("Camera Error", "Webcam access could not be acquired: " + camErr.message);
+            return;
+        }
+
+        try {
+            // Build FaceMatcher database from local storage descriptors
+            const students = JSON.parse(localStorage.getItem('students')) || [];
+            const labeledDescriptors = [];
+            
+            students.forEach(s => {
+                if (s.descriptors && s.descriptors.length > 0) {
+                    const floatDescs = s.descriptors.map(d => new Float32Array(d));
+                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(s.name, floatDescs));
+                }
+            });
+            
+            if (labeledDescriptors.length > 0) {
+                // Initialize matcher with a threshold of 0.6
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+            } else {
+                faceMatcher = null;
+                showToast("No Face Data", "There are no students registered yet. Register someone first!", "badge-red");
+            }
+            
+            scanLoopActive = true;
+            runScanningLoop();
+            
+            loadTimelineLogs();
+        } catch (err) {
+            console.error("Scanning startup failed:", err);
+            updateStatusIndicator("Scanning Error", "error");
+            showToast("Scanning Error", "An error occurred starting the attendance scanner: " + err.message);
+            stopScanner();
+        }
     });
 
     btnStop.addEventListener('click', stopScanner);
 
-    function stopScanner() {
-        // Stop stream source
-        imgFeed.src = '';
-        imgFeed.style.display = 'none';
+    async function stopScanner() {
+        scanLoopActive = false;
+        stopWebcam();
+        
+        // Clear UI Viewport
+        videoFeed.srcObject = null;
+        videoFeed.style.display = 'none';
+        canvasOverlay.style.display = 'none';
+        const ctx = canvasOverlay.getContext('2d');
+        ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+        
         placeholder.style.display = 'flex';
         container.classList.remove('streaming');
         
-        // Reset Buttons
         btnStart.disabled = false;
         btnStop.disabled = true;
+        
+        await syncWithBackend();
+        loadTimelineLogs(); // final reload
+    }
 
-        // Clear log timeline pooling
-        if (timelineIntervalId) {
-            clearInterval(timelineIntervalId);
-            timelineIntervalId = null;
+    async function runScanningLoop() {
+        if (!scanLoopActive || !activeCameraStream) return;
+        
+        if (videoFeed.paused || videoFeed.ended || videoFeed.offsetWidth === 0) {
+            requestAnimationFrame(runScanningLoop);
+            return;
         }
+        
+        try {
+            const displaySize = { width: videoFeed.offsetWidth, height: videoFeed.offsetHeight };
+            faceapi.matchDimensions(canvasOverlay, displaySize);
+            
+            // Detect all faces in scanner view with recognition descriptors
+            const detections = await faceapi.detectAllFaces(videoFeed, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+                                              .withFaceLandmarks()
+                                              .withFaceDescriptors();
+            
+            const ctx = canvasOverlay.getContext('2d');
+            ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+            
+            if (detections && detections.length > 0) {
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                
+                resizedDetections.forEach(detection => {
+                    let label = "Unknown";
+                    
+                    if (faceMatcher) {
+                        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                        // format output display label
+                        if (!bestMatch.label.includes("unknown")) {
+                            label = `${bestMatch.label.toUpperCase()} (${Math.round((1 - bestMatch.distance) * 100)}% Match)`;
+                            
+                            // Log attendance (connected to Python and local fallback)
+                            markAttendanceLocally(bestMatch.label);
+                        } else {
+                            label = "Unknown Face";
+                        }
+                    }
+                    
+                    // Render styled bounding box
+                    const box = detection.detection.box;
+                    const isUnknown = label.toLowerCase().includes("unknown");
+                    const drawBox = new faceapi.draw.DrawBox(box, { 
+                        label: label,
+                        boxColor: isUnknown ? "#ef4444" : "#10b981",
+                        lineWidth: 2
+                    });
+                    drawBox.draw(canvasOverlay);
+                });
+            }
+        } catch (err) {
+            console.error("Error running scanning frame execution:", err);
+        }
+        
+        requestAnimationFrame(runScanningLoop);
+    }
 
-        // Call server Stop Scanner API to clean up video device
-        fetch(`${API_BASE}/api/stop_attendance`, { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                console.log("Scanner stopped:", data.message);
-                loadTimelineLogs(); // final reload
-            })
-            .catch(err => console.error("Error stopping scanner:", err));
+    async function markAttendanceLocally(name) {
+        const uppercaseName = name.trim().toUpperCase();
+        const today = getTodayFormattedString();
+        
+        let attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+        
+        // Unique attendance check: check if already logged today
+        const alreadyLogged = attendance.some(log => log.Name === uppercaseName && log.Date === today);
+        
+        if (!alreadyLogged) {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            // 1. Post to Python Flask backend
+            let savedOnBackend = false;
+            try {
+                const response = await fetch(`${API_BASE}/api/mark_attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: uppercaseName })
+                });
+                if (response.ok) {
+                    savedOnBackend = true;
+                }
+            } catch (backendErr) {
+                console.warn("Backend offline. Marking locally.", backendErr);
+            }
+
+            // 2. Sync client-side fallback
+            attendance.push({
+                Name: uppercaseName,
+                Date: today,
+                Time: timeStr
+            });
+            localStorage.setItem('attendance', JSON.stringify(attendance));
+            
+            // Update Timeline Logs
+            loadTimelineLogs();
+            
+            // Pop dynamic Success Toast
+            if (savedOnBackend) {
+                showToast("Attendance Marked", `${uppercaseName} checked in. Saved inside attendance.csv!`);
+            } else {
+                showToast("Attendance Marked", `${uppercaseName} checked in (Local Storage Mode).`);
+            }
+        }
     }
 }
 
 function loadTimelineLogs() {
-    // We filter logs specifically for today to show live check-ins
     const today = getTodayFormattedString();
+    const attendance = JSON.parse(localStorage.getItem('attendance')) || [];
     
-    fetch(`${API_BASE}/api/attendance_records`)
-        .then(res => res.json())
-        .then(records => {
-            const container = document.getElementById('attendance-timeline');
-            container.innerHTML = '';
-            
-            // Filter logs for today
-            const todayLogs = records.filter(row => row.Date === today);
-            
-            // Update the counter badge
-            document.getElementById('today-log-count').textContent = `${todayLogs.length} Present`;
-
-            if (todayLogs.length === 0) {
-                container.innerHTML = '<div class="timeline-empty">Start camera to see live scans.</div>';
-                return;
-            }
-
-            // Show newest records at top
-            todayLogs.forEach(row => {
-                const item = document.createElement('div');
-                item.className = 'timeline-item';
-                item.innerHTML = `
-                    <div class="timeline-student-info">
-                        <h4>${row.Name}</h4>
-                        <span>Checked In Today</span>
-                    </div>
-                    <div class="timeline-time-badge">${row.Time}</div>
-                `;
-                container.appendChild(item);
-            });
-        })
-        .catch(err => console.error("Error loading timeline logs:", err));
+    // Filter attendance records to show only today's scans
+    const todayLogs = attendance.filter(log => log.Date === today);
+    
+    const countBadge = document.getElementById('today-log-count');
+    if (countBadge) {
+        countBadge.textContent = `${todayLogs.length} Present`;
+    }
+    
+    const container = document.getElementById('attendance-timeline');
+    if (container) {
+        container.innerHTML = '';
+        
+        if (todayLogs.length === 0) {
+            container.innerHTML = '<div class="timeline-empty">Scanner is active. Stand in front to check in.</div>';
+            return;
+        }
+        
+        // Show newest check-ins first (newest on top)
+        const reverseLogs = [...todayLogs].reverse();
+        reverseLogs.forEach(row => {
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.innerHTML = `
+                <div class="timeline-student-info">
+                    <h4>${row.Name}</h4>
+                    <span>Checked In Today</span>
+                </div>
+                <div class="timeline-time-badge">${row.Time}</div>
+            `;
+            container.appendChild(item);
+        });
+    }
 }
 
 function getTodayFormattedString() {
@@ -567,42 +1017,104 @@ function initRecordsDatabase() {
     const dateInput = document.getElementById('records-date-filter');
     const btnClear = document.getElementById('btn-clear-filters');
     const btnRefresh = document.getElementById('btn-refresh-records');
+    const btnDownload = document.getElementById('btn-download-csv');
 
-    // Attach dynamic keyboard search input listener
-    searchInput.addEventListener('input', applyRecordsFilters);
-    dateInput.addEventListener('change', applyRecordsFilters);
+    if (searchInput) searchInput.addEventListener('input', applyRecordsFilters);
+    if (dateInput) dateInput.addEventListener('change', applyRecordsFilters);
     
-    btnClear.addEventListener('click', () => {
-        searchInput.value = '';
-        dateInput.value = '';
-        applyRecordsFilters();
-    });
+    if (btnClear) {
+        btnClear.addEventListener('click', () => {
+            searchInput.value = '';
+            dateInput.value = '';
+            applyRecordsFilters();
+        });
+    }
 
-    btnRefresh.addEventListener('click', loadFullAttendanceRecords);
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', async () => {
+            await syncWithBackend();
+            loadFullAttendanceRecords();
+        });
+    }
+
+    if (btnDownload) {
+        btnDownload.addEventListener('click', () => {
+            const students = JSON.parse(localStorage.getItem('students')) || [];
+            const attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+            
+            if (students.length === 0 && attendance.length === 0) {
+                showToast("No Data", "There is no data to export.", "badge-red");
+                return;
+            }
+            
+            let csvContent = "";
+            
+            // 1. Registered Students Section
+            csvContent += "=== REGISTERED STUDENTS DATABASE ===\n";
+            csvContent += "Student Name,Email Address,Class/Semester,No. of Face Samples\n";
+            students.forEach(row => {
+                const line = [
+                    row.name,
+                    row.email,
+                    row.class_name,
+                    row.descriptors ? row.descriptors.length : 0
+                ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
+                csvContent += line + "\n";
+            });
+            
+            csvContent += "\n"; // Blank separator line
+            
+            // 2. Attendance Logs Section
+            csvContent += "=== ATTENDANCE LOGS DATABASE ===\n";
+            csvContent += "Student Name,Date Logged,Time Registered\n";
+            attendance.forEach(row => {
+                const line = [
+                    row.Name,
+                    row.Date,
+                    row.Time
+                ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
+                csvContent += line + "\n";
+            });
+            
+            // Create Downloadable Blob URL
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `attendance_and_students_report_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast("CSV Exported", "Unified CSV report downloaded successfully.");
+        });
+    }
 }
 
 function loadFullAttendanceRecords() {
     const tbody = document.getElementById('table-records-body');
-    tbody.innerHTML = '<tr><td colspan="4" class="no-records">Refreshing records from CSV...</td></tr>';
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="4" class="no-records">Refreshing logs...</td></tr>';
+    }
     
-    fetch(`${API_BASE}/api/attendance_records`)
-        .then(res => res.json())
-        .then(records => {
-            globalRecords = records; // cache in state
-            applyRecordsFilters(); // render filtered records
-        })
-        .catch(err => {
-            tbody.innerHTML = '<tr><td colspan="4" class="no-records text-danger">Failed to reload records from attendance.csv</td></tr>';
-            console.error("Error loading database records:", err);
-        });
+    // Read local storage database
+    const attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+    globalRecords = attendance; // Cache
+    applyRecordsFilters();
 }
 
 function applyRecordsFilters() {
     const tbody = document.getElementById('table-records-body');
-    const searchQuery = document.getElementById('records-search').value.trim().toUpperCase();
-    const dateQuery = document.getElementById('records-date-filter').value; // YYYY-MM-DD
+    if (!tbody) return;
     
-    // Parse date filter to DD-MM-YYYY
+    const searchInput = document.getElementById('records-search');
+    const dateInput = document.getElementById('records-date-filter');
+    
+    const searchQuery = searchInput ? searchInput.value.trim().toUpperCase() : '';
+    const dateQuery = dateInput ? dateInput.value : ''; // Formats: YYYY-MM-DD
+    
+    // Parse date filter to DD-MM-YYYY matching local format
     let formattedDateQuery = '';
     if (dateQuery) {
         const parts = dateQuery.split('-');
@@ -613,7 +1125,7 @@ function applyRecordsFilters() {
 
     tbody.innerHTML = '';
 
-    // Apply Filter conditions
+    // Filter condition matching
     const filtered = globalRecords.filter(row => {
         const matchName = !searchQuery || String(row.Name).toUpperCase().includes(searchQuery);
         const matchDate = !formattedDateQuery || String(row.Date) === formattedDateQuery;
@@ -621,13 +1133,15 @@ function applyRecordsFilters() {
     });
 
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="no-records">No attendance matches found in database.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="no-records">No matching records found.</td></tr>';
         return;
     }
 
-    // Draw rows
-    filtered.forEach(row => {
+    // Render table rows (newest first)
+    const reversedFiltered = [...filtered].reverse();
+    reversedFiltered.forEach(row => {
         const tr = document.createElement('tr');
+        tr.className = 'animate-fade';
         tr.innerHTML = `
             <td style="font-weight:600; text-transform: uppercase;">${row.Name}</td>
             <td>${row.Date}</td>
@@ -643,6 +1157,7 @@ function applyRecordsFilters() {
    ========================================================================== */
 function initThemeToggle() {
     const themeBtn = document.getElementById('theme-toggle');
+    if (!themeBtn) return;
     const sunIcon = document.getElementById('sun-icon');
     const moonIcon = document.getElementById('moon-icon');
 
@@ -650,20 +1165,20 @@ function initThemeToggle() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
         document.body.classList.add('light-theme');
-        sunIcon.style.display = 'none';
-        moonIcon.style.display = 'block';
+        if (sunIcon) sunIcon.style.display = 'none';
+        if (moonIcon) moonIcon.style.display = 'block';
     }
 
     themeBtn.addEventListener('click', () => {
         const isLight = document.body.classList.toggle('light-theme');
         if (isLight) {
             localStorage.setItem('theme', 'light');
-            sunIcon.style.display = 'none';
-            moonIcon.style.display = 'block';
+            if (sunIcon) sunIcon.style.display = 'none';
+            if (moonIcon) moonIcon.style.display = 'block';
         } else {
             localStorage.setItem('theme', 'dark');
-            sunIcon.style.display = 'block';
-            moonIcon.style.display = 'none';
+            if (sunIcon) sunIcon.style.display = 'block';
+            if (moonIcon) moonIcon.style.display = 'none';
         }
     });
 }
@@ -671,7 +1186,7 @@ function initThemeToggle() {
 /* ==========================================================================
    WIDGET: PREMIUM SUCCESS TOAST NOTIFICATIONS
    ========================================================================== */
-function showToast(title, message) {
+function showToast(title, message, badgeClass = 'badge-green') {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -682,8 +1197,12 @@ function showToast(title, message) {
 
     const toast = document.createElement('div');
     toast.className = 'toast animate-fade';
+    
+    // Choose icon base color based on badge styling
+    const iconColor = badgeClass === 'badge-red' ? 'hsl(var(--accent-red))' : 'hsl(var(--accent-green))';
+    
     toast.innerHTML = `
-        <div class="toast-icon">
+        <div class="toast-icon" style="color: ${iconColor}">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
             </svg>
@@ -708,7 +1227,7 @@ function showToast(title, message) {
     // Show slide-in toast
     toast.classList.add('show');
 
-    // Bind manually click dismiss behavior
+    // Bind click dismiss behavior
     const closeBtn = toast.querySelector('.toast-close');
     closeBtn.addEventListener('click', () => dismissToast(toast));
 
@@ -719,6 +1238,7 @@ function showToast(title, message) {
 }
 
 function dismissToast(toast) {
+    if (!toast.parentNode) return;
     toast.classList.remove('show');
     toast.addEventListener('transitionend', () => {
         toast.remove();

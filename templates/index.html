@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Link Custom Premium Stylesheet -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="../static/css/style.css">
 </head>
 <body>
     <div class="app-container">
@@ -192,9 +192,12 @@
                         </div>
 
                         <div class="recent-card glass-panel">
-                            <div class="panel-header">
+                            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                                 <h2>Registered Students</h2>
-                                <a href="#" onclick="switchTab('tab-register'); return false;" class="view-all-link">Register New</a>
+                                <div style="display: flex; gap: 15px;">
+                                    <a href="#" onclick="switchTab('tab-register'); return false;" class="view-all-link">Register New</a>
+                                    <a href="../students_list.html" class="view-all-link" style="color: hsl(var(--accent-blue));">View Gallery</a>
+                                </div>
                             </div>
                             <div class="student-pill-list" id="dashboard-student-list">
                                 <div class="no-records">No students registered yet.</div>
@@ -258,7 +261,8 @@
                                     <div class="corner-bracket bottom-right"></div>
                                 </div>
 
-                                <img id="reg-camera-feed" class="camera-feed-img" src="" alt="Webcam Feed">
+                                <video id="reg-camera-feed" class="camera-feed-img" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <canvas id="reg-camera-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none;"></canvas>
 
                                 <div class="camera-placeholder" id="reg-camera-placeholder">
                                     <div class="placeholder-icon animate-float">
@@ -314,8 +318,9 @@
                                     <div class="corner-bracket bottom-right"></div>
                                 </div>
 
-                                <!-- Webcam image stream -->
-                                <img id="camera-feed" class="camera-feed-img" src="" alt="Webcam Feed">
+                                <!-- Webcam video stream -->
+                                <video id="camera-feed" class="camera-feed-img" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <canvas id="camera-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none;"></canvas>
 
                                 <!-- Offline View State -->
                                 <div class="camera-placeholder" id="camera-placeholder">
@@ -369,12 +374,22 @@
                                 <h2>Logs & Attendance Database</h2>
                                 <p>Search and filter registered check-ins logged by the facial recognition device.</p>
                             </div>
-                            <button id="btn-refresh-records" class="btn btn-secondary">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                                </svg>
-                                Refresh Data
-                            </button>
+                            <div style="display: flex; gap: 10px;">
+                                <button id="btn-download-csv" class="btn btn-success" style="background: linear-gradient(135deg, #10b981, #059669); border: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7 10 12 15 17 10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    Export CSV Report
+                                </button>
+                                <button id="btn-refresh-records" class="btn btn-secondary">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                    </svg>
+                                    Refresh Data
+                                </button>
+                            </div>
                         </div>
 
                         <div class="records-filter-row">
@@ -416,7 +431,9 @@
         </main>
     </div>
 
+    <!-- Include face-api.js from a public CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <!-- Include Javascript Architecture -->
-    <script src="/static/js/app.js"></script>
+    <script defer src="../static/js/app.js"></script>
 </body>
 </html>

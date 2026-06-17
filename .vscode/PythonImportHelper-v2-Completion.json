@@ -193,7 +193,7 @@
         "kind": 2,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "def add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n@app.before_request\ndef handle_options_requests():\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        response.headers['Access-Control-Allow-Origin'] = '*'",
+        "peekOfCode": "def add_cors_headers(response):\n    origin = request.headers.get('Origin')\n    if origin:\n        response.headers['Access-Control-Allow-Origin'] = origin\n    else:\n        response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    response.headers['Access-Control-Allow-Private-Network'] = 'true'\n    response.headers['Access-Control-Allow-Credentials'] = 'true'",
         "detail": "web_app",
         "documentation": {}
     },
@@ -202,7 +202,25 @@
         "kind": 2,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "def handle_options_requests():\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        response.headers['Access-Control-Allow-Origin'] = '*'\n        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n        return response\n# Setup Directories\nif not os.path.exists('training_images'):\n    os.makedirs('training_images')",
+        "peekOfCode": "def handle_options_requests():\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        origin = request.headers.get('Origin')\n        if origin:\n            response.headers['Access-Control-Allow-Origin'] = origin\n        else:\n            response.headers['Access-Control-Allow-Origin'] = '*'\n        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'",
+        "detail": "web_app",
+        "documentation": {}
+    },
+    {
+        "label": "handle_405_error",
+        "kind": 2,
+        "importPath": "web_app",
+        "description": "web_app",
+        "peekOfCode": "def handle_405_error(e):\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        origin = request.headers.get('Origin')\n        if origin:\n            response.headers['Access-Control-Allow-Origin'] = origin\n        else:\n            response.headers['Access-Control-Allow-Origin'] = '*'\n        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'",
+        "detail": "web_app",
+        "documentation": {}
+    },
+    {
+        "label": "handle_global_exception",
+        "kind": 2,
+        "importPath": "web_app",
+        "description": "web_app",
+        "peekOfCode": "def handle_global_exception(e):\n    print(f\"[SERVER CRASH] Unhandled exception: {e}\")\n    import traceback\n    traceback.print_exc()\n    response = jsonify({\"success\": False, \"message\": f\"Internal Server Error: {str(e)}\"})\n    response.status_code = 500\n    origin = request.headers.get('Origin')\n    if origin:\n        response.headers['Access-Control-Allow-Origin'] = origin\n    else:",
         "detail": "web_app",
         "documentation": {}
     },
@@ -400,7 +418,7 @@
         "kind": 5,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "app = Flask(__name__, template_folder='.')\n@app.after_request\ndef add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n@app.before_request\ndef handle_options_requests():\n    if request.method == 'OPTIONS':",
+        "peekOfCode": "app = Flask(__name__, template_folder='.')\n@app.after_request\ndef add_cors_headers(response):\n    origin = request.headers.get('Origin')\n    if origin:\n        response.headers['Access-Control-Allow-Origin'] = origin\n    else:\n        response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'",
         "detail": "web_app",
         "documentation": {}
     },

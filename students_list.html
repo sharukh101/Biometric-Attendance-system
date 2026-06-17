@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registered Students Photo Gallery</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS variables matching main app design system */
+        :root {
+            --bg-app: #0a0b10;
+            --bg-card: #181922;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #0ea5e9;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-glass: rgba(148, 163, 184, 0.15);
+        }
+
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.05) 0px, transparent 50%);
+        }
+
+        header {
+            max-width: 1200px;
+            margin: 0 auto 30px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-glass);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            margin: 0;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 5px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .search-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        .search-bar:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-refresh:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .stats-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .gallery-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .student-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .student-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(139, 92, 246, 0.3);
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+        }
+
+        .btn-delete {
+            background: transparent;
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            color: var(--accent-red);
+            cursor: pointer;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: var(--accent-red);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+        }
+
+        .card-info {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-info label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .images-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .img-box {
+            background: var(--bg-app);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+            aspect-ratio: 1;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .img-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .img-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.65);
+            color: white;
+            font-size: 0.65rem;
+            text-align: center;
+            padding: 3px 0;
+            font-weight: 600;
+            backdrop-filter: blur(2px);
+        }
+
+        .no-photo-placeholder {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            color: var(--text-muted);
+            opacity: 0.3;
+        }
+        
+        .back-link {
+            color: var(--accent-purple);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 25px;
+            transition: all 0.2s ease;
+        }
+        
+        .back-link:hover {
+            color: var(--accent-blue);
+            transform: translateX(-4px);
+        }
+    </style>
+</head>
+<body>
+
+    <div style="max-width: 1200px; margin: 0 auto;">
+        <a href="index.html" class="back-link">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back to Attendance Dashboard
+        </a>
+    </div>
+
+    <header>
+        <div>
+            <h1>Registered Students Photo Gallery</h1>
+            <div class="subtitle">Real-time dynamic display of registered facial templates and photo records</div>
+        </div>
+        <div class="header-actions">
+            <span class="stats-badge" id="total-badge">0 Registered</span>
+            <input type="text" id="search-input" class="search-bar" placeholder="Search by name or class...">
+            <button id="btn-refresh" class="btn-refresh">Refresh Gallery</button>
+        </div>
+    </header>
+
+    <main class="gallery-grid" id="gallery-container">
+        <!-- Student cards will be loaded here dynamically -->
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load what we have locally first
+            loadGallery();
+            
+            // Sync with backend
+            await syncWithBackend();
+            
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', filterGallery);
+            }
+            
+            const btnRefresh = document.getElementById('btn-refresh');
+            if (btnRefresh) {
+                btnRefresh.addEventListener('click', async () => {
+                    await syncWithBackend();
+                });
+            }
+            
+            // Auto refresh the gallery in real-time if student registrations change in another tab
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'students') {
+                    loadGallery();
+                }
+            });
+        });
+
+        let allStudents = [];
+
+        async function syncWithBackend() {
+            const API_BASE = "http://127.0.0.1:5000";
+            try {
+                const res = await fetch(`${API_BASE}/api/students`);
+                if (res.ok) {
+                    allStudents = await res.json();
+                    localStorage.setItem('students', JSON.stringify(allStudents));
+                    console.log("Synchronized gallery with Python backend.");
+                } else {
+                    allStudents = JSON.parse(localStorage.getItem('students')) || [];
+                }
+            } catch (err) {
+                console.warn("Python backend offline. Loading from local storage.", err);
+                allStudents = JSON.parse(localStorage.getItem('students')) || [];
+            }
+            loadGallery();
+        }
+
+        function loadGallery() {
+            const container = document.getElementById('gallery-container');
+            const totalBadge = document.getElementById('total-badge');
+            if (!container) return;
+            
+            // Retrieve shared database if empty
+            if (allStudents.length === 0) {
+                allStudents = JSON.parse(localStorage.getItem('students')) || [];
+            }
+            
+            // Update stats badge
+            if (totalBadge) {
+                totalBadge.textContent = `${allStudents.length} Registered`;
+            }
+            
+            renderCards(allStudents);
+        }
+
+        function renderCards(studentsList) {
+            const container = document.getElementById('gallery-container');
+            container.innerHTML = '';
+            
+            if (studentsList.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">👤</div>
+                        <h3>No Student Records Found</h3>
+                        <p>Open the main dashboard and register new student profiles to show their snapshots here.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            studentsList.forEach(student => {
+                const card = document.createElement('div');
+                card.className = 'student-card';
+                
+                let infoHtml = `
+                    <div class="card-header">
+                        <h3>${student.name}</h3>
+                        <button class="btn-delete" onclick="deleteStudent('${student.name.replace(/'/g, "\\'")}')" title="Delete Registration">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card-info">
+                        <label>Email Address</label>
+                        <span>${student.email}</span>
+                    </div>
+                    <div class="card-info">
+                        <label>Class/Semester</label>
+                        <span>${student.class_name}</span>
+                    </div>
+                `;
+                
+                let photosHtml = '<div class="images-row">';
+                const angles = ['Straight', 'Left', 'Right'];
+                
+                for (let i = 0; i < 3; i++) {
+                    photosHtml += '<div class="img-box">';
+                    if (student.images && student.images[i]) {
+                        photosHtml += `
+                            <img src="${student.images[i]}" alt="${student.name} - ${angles[i]}">
+                            <div class="img-label">${angles[i]}</div>
+                        `;
+                    } else {
+                        photosHtml += `
+                            <div class="no-photo-placeholder">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                                <span>No Photo</span>
+                            </div>
+                            <div class="img-label">${angles[i]}</div>
+                        `;
+                    }
+                    photosHtml += '</div>';
+                }
+                photosHtml += '</div>';
+                
+                card.innerHTML = infoHtml + photosHtml;
+                container.appendChild(card);
+            });
+        }
+
+        function filterGallery() {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            const filtered = allStudents.filter(student => {
+                const matchName = student.name.toLowerCase().includes(query);
+                const matchClass = student.class_name.toLowerCase().includes(query);
+                return matchName || matchClass;
+            });
+            renderCards(filtered);
+        }
+
+        async function deleteStudent(name) {
+            if (confirm(`Are you sure you want to delete the student registration for "${name}"? This will permanently remove their details and face templates.`)) {
+                const API_BASE = "http://127.0.0.1:5000";
+                
+                // 1. Delete from Python backend
+                try {
+                    const response = await fetch(`${API_BASE}/api/delete_student`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name })
+                    });
+                    if (response.ok) {
+                        console.log(`Successfully deleted ${name} from Python backend.`);
+                    }
+                } catch (err) {
+                    console.warn("Python backend offline. Deleting from local storage only.", err);
+                }
+
+                // 2. Delete from local storage fallback
+                let students = JSON.parse(localStorage.getItem('students')) || [];
+                students = students.filter(s => s.name !== name);
+                localStorage.setItem('students', JSON.stringify(students));
+                
+                // Update active list and reload view
+                allStudents = students;
+                loadGallery();
+            }
+        }
+    </script>
+</body>
+</html>
