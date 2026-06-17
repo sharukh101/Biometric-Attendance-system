@@ -1095,7 +1095,7 @@ function initRecordsDatabase() {
 function loadFullAttendanceRecords() {
     const tbody = document.getElementById('table-records-body');
     if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="4" class="no-records">Refreshing logs...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="no-records">Refreshing logs...</td></tr>';
     }
     
     // Read local storage database
@@ -1133,7 +1133,7 @@ function applyRecordsFilters() {
     });
 
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="no-records">No matching records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="no-records">No matching records found.</td></tr>';
         return;
     }
 
@@ -1147,10 +1147,50 @@ function applyRecordsFilters() {
             <td>${row.Date}</td>
             <td style="font-family: monospace; font-weight:500;">${row.Time}</td>
             <td><span class="badge badge-purple">FACIAL VERIFIED</span></td>
+            <td>
+                <button class="btn-delete" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-glass); background: transparent; color: var(--accent-red); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease;" onclick="deleteAttendanceRecord('${row.Name.replace(/'/g, "\\'")}', '${row.Date}', '${row.Time}')" title="Delete Attendance Log">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
 }
+
+async function deleteAttendanceRecord(name, date, time) {
+    if (confirm(`Are you sure you want to delete the attendance log for "${name}" on ${date} at ${time}?`)) {
+        const uppercaseName = name.trim().toUpperCase();
+        
+        // 1. Try deleting from Flask backend
+        try {
+            const response = await fetch(`${API_BASE}/api/delete_attendance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: uppercaseName, date: date, time: time })
+            });
+            if (response.ok) {
+                console.log("Deleted attendance record from Python backend.");
+            }
+        } catch (err) {
+            console.warn("Python backend offline. Deleting from local storage only.", err);
+        }
+
+        // 2. Delete from local storage fallback
+        let attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+        attendance = attendance.filter(log => !(log.Name === uppercaseName && log.Date === date && log.Time === time));
+        localStorage.setItem('attendance', JSON.stringify(attendance));
+
+        // 3. Refresh UI views
+        loadDashboardData();
+        loadTimelineLogs();
+        loadFullAttendanceRecords();
+        showToast("Record Deleted", `Attendance log for ${uppercaseName} was deleted.`);
+    }
+}
+window.deleteAttendanceRecord = deleteAttendanceRecord;
 
 /* ==========================================================================
    THEME TOGGLE ENGINE (LIGHT / DARK MODE)

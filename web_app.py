@@ -258,6 +258,36 @@ def delete_student():
         print("Error deleting student:", e)
         return jsonify({"success": False, "message": str(e)}), 500
 
+@app.route('/api/delete_attendance', methods=['POST'])
+def delete_attendance():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip().upper()
+    date_str = data.get("date", "").strip()
+    time_str = data.get("time", "").strip()
+
+    if not name or not date_str or not time_str:
+        return jsonify({"success": False, "message": "Name, Date, and Time are required"}), 400
+
+    try:
+        rows = []
+        if os.path.exists(ATTENDANCE_CSV):
+            with open(ATTENDANCE_CSV, mode='r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+        
+        header = rows[0] if rows else ["Name", "Date", "Time"]
+        filtered_rows = [row for row in rows[1:] if not (row[0] == name and row[1] == date_str and row[2] == time_str)]
+        filtered_rows.insert(0, header)
+
+        with open(ATTENDANCE_CSV, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(filtered_rows)
+
+        return jsonify({"success": True, "message": f"Deleted attendance record for {name} on {date_str} at {time_str}"})
+    except Exception as e:
+        print("Error deleting attendance record:", e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route('/')
 @app.route('/index.html')
 def serve_index():
