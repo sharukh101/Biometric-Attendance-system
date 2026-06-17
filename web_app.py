@@ -16,9 +16,43 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
 
+@app.before_request
+def handle_options_requests():
+    if request.method == 'OPTIONS':
+        response = app.make_response(('', 204))
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        return response
+
+
 # Setup Directories
 if not os.path.exists('training_images'):
     os.makedirs('training_images')
+
+def robust_video_capture():
+    """Tries to find and open an active webcam device by searching indices 0, 1, 2."""
+    for index in [0, 1, 2]:
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print(f"[CAMERA SUCCESS] Opened webcam at index {index} using default backend.")
+                return cap
+            cap.release()
+
+    for index in [0, 1, 2]:
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print(f"[CAMERA SUCCESS] Opened webcam at index {index} using CAP_DSHOW backend.")
+                return cap
+            cap.release()
+
+    print("[CAMERA ERROR] No active webcam found at indices 0, 1, or 2.")
+    return None
+
 
 def detect_faces_robust(gray):
     """Detects faces using both frontal and profile cascades to handle turned/angled faces."""
@@ -188,11 +222,8 @@ def generate_frames():
         face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
         # Initialize camera
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(0)  # fallback
-            
-        if not cap.isOpened():
+        cap = robust_video_capture()
+        if cap is None:
             frame = create_error_frame("Webcam is in use or not connected!")
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
@@ -320,11 +351,8 @@ def register_student():
         return jsonify({"success": False, "message": "Student Name cannot be blank!"}), 400
 
     # Open camera to capture 3 snapshots
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(0)
-
-    if not cap.isOpened():
+    cap = robust_video_capture()
+    if cap is None:
         return jsonify({"success": False, "message": "Cannot open webcam. It might be locked by another application."}), 500
 
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -399,11 +427,8 @@ def generate_register_frames():
     """Generates JPEG frames for the registration viewfinder camera."""
     global register_camera_active, active_cap, current_register_frame
     try:
-        active_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        if not active_cap.isOpened():
-            active_cap = cv2.VideoCapture(0)  # fallback
-            
-        if not active_cap.isOpened():
+        active_cap = robust_video_capture()
+        if active_cap is None:
             frame = create_error_frame("Webcam is locked or not connected!")
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')

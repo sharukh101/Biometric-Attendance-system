@@ -9,6 +9,30 @@ import pandas as pd
 # Setup Directories
 if not os.path.exists('training_images'): os.makedirs('training_images')
 
+def robust_video_capture():
+    """Tries to find and open an active webcam device by searching indices 0, 1, 2."""
+    for index in [0, 1, 2]:
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print(f"[CAMERA SUCCESS] Opened webcam at index {index} using default backend.")
+                return cap
+            cap.release()
+
+    for index in [0, 1, 2]:
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print(f"[CAMERA SUCCESS] Opened webcam at index {index} using CAP_DSHOW backend.")
+                return cap
+            cap.release()
+
+    print("[CAMERA ERROR] No active webcam found at indices 0, 1, or 2.")
+    return None
+
+
 def extract_student_name(filename):
     """Robust helper to extract clean student name from their training image filename."""
     base = os.path.splitext(filename)[0]
@@ -214,11 +238,8 @@ class AttendanceSystem:
             
             if self.camera_running:
                 return
-                
-            self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-            if not self.cap.isOpened():
-                self.cap = cv2.VideoCapture(0)
-            if not self.cap.isOpened():
+            self.cap = robust_video_capture()
+            if self.cap is None:
                 messagebox.showerror("Error", "Cannot open webcam!")
                 return
                 
@@ -403,7 +424,10 @@ class AttendanceSystem:
             names.append(extract_student_name(f))
 
         self.model.train(np.asarray(training_data), np.asarray(labels))
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        cap = robust_video_capture()
+        if cap is None:
+            messagebox.showerror("Error", "Cannot open webcam!")
+            return
         while True:
             ret, frame = cap.read()
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

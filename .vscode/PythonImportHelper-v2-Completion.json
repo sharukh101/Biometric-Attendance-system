@@ -144,6 +144,15 @@
         "documentation": {}
     },
     {
+        "label": "robust_video_capture",
+        "kind": 2,
+        "importPath": "attendance_sys",
+        "description": "attendance_sys",
+        "peekOfCode": "def robust_video_capture():\n    \"\"\"Tries to find and open an active webcam device by searching indices 0, 1, 2.\"\"\"\n    for index in [0, 1, 2]:\n        cap = cv2.VideoCapture(index)\n        if cap.isOpened():\n            ret, frame = cap.read()\n            if ret and frame is not None and frame.size > 0:\n                print(f\"[CAMERA SUCCESS] Opened webcam at index {index} using default backend.\")\n                return cap\n            cap.release()",
+        "detail": "attendance_sys",
+        "documentation": {}
+    },
+    {
         "label": "extract_student_name",
         "kind": 2,
         "importPath": "attendance_sys",
@@ -184,7 +193,25 @@
         "kind": 2,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "def add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n# Setup Directories\nif not os.path.exists('training_images'):\n    os.makedirs('training_images')\ndef detect_faces_robust(gray):\n    \"\"\"Detects faces using both frontal and profile cascades to handle turned/angled faces.\"\"\"",
+        "peekOfCode": "def add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n@app.before_request\ndef handle_options_requests():\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        response.headers['Access-Control-Allow-Origin'] = '*'",
+        "detail": "web_app",
+        "documentation": {}
+    },
+    {
+        "label": "handle_options_requests",
+        "kind": 2,
+        "importPath": "web_app",
+        "description": "web_app",
+        "peekOfCode": "def handle_options_requests():\n    if request.method == 'OPTIONS':\n        response = app.make_response(('', 204))\n        response.headers['Access-Control-Allow-Origin'] = '*'\n        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n        return response\n# Setup Directories\nif not os.path.exists('training_images'):\n    os.makedirs('training_images')",
+        "detail": "web_app",
+        "documentation": {}
+    },
+    {
+        "label": "robust_video_capture",
+        "kind": 2,
+        "importPath": "web_app",
+        "description": "web_app",
+        "peekOfCode": "def robust_video_capture():\n    \"\"\"Tries to find and open an active webcam device by searching indices 0, 1, 2.\"\"\"\n    for index in [0, 1, 2]:\n        cap = cv2.VideoCapture(index)\n        if cap.isOpened():\n            ret, frame = cap.read()\n            if ret and frame is not None and frame.size > 0:\n                print(f\"[CAMERA SUCCESS] Opened webcam at index {index} using default backend.\")\n                return cap\n            cap.release()",
         "detail": "web_app",
         "documentation": {}
     },
@@ -328,7 +355,7 @@
         "kind": 2,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "def generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)\n        if not active_cap.isOpened():\n            active_cap = cv2.VideoCapture(0)  # fallback\n        if not active_cap.isOpened():\n            frame = create_error_frame(\"Webcam is locked or not connected!\")\n            yield (b'--frame\\r\\n'",
+        "peekOfCode": "def generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = robust_video_capture()\n        if active_cap is None:\n            frame = create_error_frame(\"Webcam is locked or not connected!\")\n            yield (b'--frame\\r\\n'\n                   b'Content-Type: image/jpeg\\r\\n\\r\\n' + frame + b'\\r\\n')\n            return",
         "detail": "web_app",
         "documentation": {}
     },
@@ -373,7 +400,7 @@
         "kind": 5,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "app = Flask(__name__, template_folder='.')\n@app.after_request\ndef add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n# Setup Directories\nif not os.path.exists('training_images'):\n    os.makedirs('training_images')",
+        "peekOfCode": "app = Flask(__name__, template_folder='.')\n@app.after_request\ndef add_cors_headers(response):\n    response.headers['Access-Control-Allow-Origin'] = '*'\n    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'\n    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'\n    return response\n@app.before_request\ndef handle_options_requests():\n    if request.method == 'OPTIONS':",
         "detail": "web_app",
         "documentation": {}
     },
@@ -409,7 +436,7 @@
         "kind": 5,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "register_camera_active = False\ncurrent_register_frame = None\nactive_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)\n        if not active_cap.isOpened():\n            active_cap = cv2.VideoCapture(0)  # fallback",
+        "peekOfCode": "register_camera_active = False\ncurrent_register_frame = None\nactive_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = robust_video_capture()\n        if active_cap is None:\n            frame = create_error_frame(\"Webcam is locked or not connected!\")",
         "detail": "web_app",
         "documentation": {}
     },
@@ -418,7 +445,7 @@
         "kind": 5,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "current_register_frame = None\nactive_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)\n        if not active_cap.isOpened():\n            active_cap = cv2.VideoCapture(0)  # fallback\n        if not active_cap.isOpened():",
+        "peekOfCode": "current_register_frame = None\nactive_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = robust_video_capture()\n        if active_cap is None:\n            frame = create_error_frame(\"Webcam is locked or not connected!\")\n            yield (b'--frame\\r\\n'",
         "detail": "web_app",
         "documentation": {}
     },
@@ -427,7 +454,7 @@
         "kind": 5,
         "importPath": "web_app",
         "description": "web_app",
-        "peekOfCode": "active_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)\n        if not active_cap.isOpened():\n            active_cap = cv2.VideoCapture(0)  # fallback\n        if not active_cap.isOpened():\n            frame = create_error_frame(\"Webcam is locked or not connected!\")",
+        "peekOfCode": "active_cap = None\ndef generate_register_frames():\n    \"\"\"Generates JPEG frames for the registration viewfinder camera.\"\"\"\n    global register_camera_active, active_cap, current_register_frame\n    try:\n        active_cap = robust_video_capture()\n        if active_cap is None:\n            frame = create_error_frame(\"Webcam is locked or not connected!\")\n            yield (b'--frame\\r\\n'\n                   b'Content-Type: image/jpeg\\r\\n\\r\\n' + frame + b'\\r\\n')",
         "detail": "web_app",
         "documentation": {}
     },
